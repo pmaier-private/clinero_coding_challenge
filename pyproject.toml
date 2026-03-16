@@ -1,0 +1,25 @@
+[project]
+name = "clieno-coding-challenge"
+version = "0.1.0"
+description = "ML0 extraction pipeline PoC for ivoris data"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+ivoris-extractor = "clieno_extractor.main:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clieno_extractor"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
