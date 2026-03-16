@@ -54,26 +54,27 @@ Just the extractor, which stores the data directly to csv! No service for data r
 
 	* `data/output/ivoris_extract.csv`
 
+## Tests
+
+```bash
+uv run --dev python -m pytest
+```
 
 ## Configuration
 
 Environment variables (see `.env.example`):
 
 * `IVORIS_INTERVAL_SECONDS` (default `86400`)
-* `IVORIS_SOURCE_CSV` (default `data/input/ivoris_file_entries.csv`, currently unused placeholder)
 * `IVORIS_OUTPUT_CSV` (default `data/output/ivoris_extract.csv`)
 * `IVORIS_RUN_ONCE` (`true`/`false`)
 * `IVORIS_DB_SERVER` (default `localhost`)
 * `IVORIS_DB_NAME` (default `DentalDB`)
 * `IVORIS_DB_SCHEMA` (default `ck`)
-* `IVORIS_DB_DRIVER` (default `ODBC Driver 18 for SQL Server`)
+* `IVORIS_DB_DRIVER` (default `ODBC Driver 17 for SQL Server`)
 
 
 ## Notes
 
 * Current implementation is ML0 only (direct CSV storage, no REST API yet).
-* Source reading now queries MS SQL Server using Windows Authentication and writes full snapshots to CSV.
-* The extractor writes a full CSV snapshot every run (no incremental state/checkpoint).
-* `extractor.py` contains the SQL query against `ck.KARTEI` and `ck.PATKASSE`.
 
  

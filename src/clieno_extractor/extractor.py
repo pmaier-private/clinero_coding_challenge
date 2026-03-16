@@ -13,7 +13,7 @@ class FileEntry:
     patient_id: str
     insurance_state: str
     file_entry: str
-    services: str
+    service: str
 
 
 def _normalize_entry_date(value: object) -> date | None:
@@ -41,12 +41,21 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
         "TrustServerCertificate=yes;"
     )
     query = f"""
-        WITH latest_entries AS (
+        WITH services_by_day AS (
+            SELECT
+                l.PATIENTID,
+                CONVERT(date, l.DATUM) AS DATUM,
+                STRING_AGG(CAST(l.LEISTUNG AS nvarchar(max)), ' ') AS SERVICES
+            FROM {settings.db_schema}.LEISTUNG AS l
+            GROUP BY l.PATIENTID, CONVERT(date, l.DATUM)
+        ),
+        latest_entries AS (
             SELECT
                 k.DATUM,
                 k.PATNR,
                 p.STATUS,
                 k.BEMERKUNG,
+                COALESCE(s.SERVICES, '') AS SERVICE,
                 ROW_NUMBER() OVER (
                     PARTITION BY COALESCE(k.FOLLOWERID, k.ID)
                     ORDER BY k.ID DESC
@@ -54,8 +63,11 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
             FROM {settings.db_schema}.KARTEI AS k
             LEFT JOIN {settings.db_schema}.PATKASSE AS p
                 ON p.PATNR = k.PATNR
+            LEFT JOIN services_by_day AS s
+                ON s.PATIENTID = k.PATNR
+                AND s.DATUM = CONVERT(date, k.DATUM)
         )
-        SELECT DATUM, PATNR, STATUS, BEMERKUNG
+        SELECT DATUM, PATNR, STATUS, BEMERKUNG, SERVICE
         FROM latest_entries
         WHERE rn = 1
         ORDER BY DATUM, PATNR
@@ -66,7 +78,7 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
         cursor = connection.cursor()
         cursor.execute(query)
 
-        for raw_entry_date, raw_patient_id, raw_insurance_state, raw_file_entry in cursor.fetchall():
+        for raw_entry_date, raw_patient_id, raw_insurance_state, raw_file_entry, raw_service in cursor.fetchall():
             entry_date = _normalize_entry_date(raw_entry_date)
             if entry_date is None:
                 continue
@@ -77,7 +89,7 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
                     patient_id=str(raw_patient_id or ""),
                     insurance_state=str(raw_insurance_state or ""),
                     file_entry=str(raw_file_entry or ""),
-                    services="",
+                    service=str(raw_service or ""),
                 )
             )
 
@@ -90,7 +102,7 @@ def _write_full_output(output_csv: Path, entries: list[FileEntry]) -> None:
     with output_csv.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=["entry_date", "patient_id", "insurance_state", "file_entry", "services"],
+            fieldnames=["entry_date", "patient_id", "insurance_state", "file_entry", "service"],
         )
         writer.writeheader()
 
@@ -101,7 +113,7 @@ def _write_full_output(output_csv: Path, entries: list[FileEntry]) -> None:
                     "patient_id": entry.patient_id,
                     "insurance_state": entry.insurance_state,
                     "file_entry": entry.file_entry,
-                    "services": entry.services,
+                    "service": entry.service,
                 }
             )
 

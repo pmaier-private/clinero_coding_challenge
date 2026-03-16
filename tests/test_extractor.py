@@ -35,9 +35,9 @@ def test_read_source_entries_fetches_mapped_rows(monkeypatch, tmp_path: Path) ->
     captured = {"connection_string": "", "query": ""}
 
     rows = [
-        (datetime(2026, 3, 14, 8, 30, 0), "PAT-001", "Member", "Routine checkup"),
-        (date(2026, 3, 15), "PAT-002", "Private", "Follow-up"),
-        ("bad-date", "PAT-003", "Retired", "Ignored because date is invalid"),
+        (datetime(2026, 3, 14, 8, 30, 0), "PAT-001", "Member", "Routine checkup", "CHK001 XRAY010"),
+        (date(2026, 3, 15), "PAT-002", "Private", "Follow-up", "FUP050"),
+        ("bad-date", "PAT-003", "Retired", "Ignored because date is invalid", "IGNORED"),
     ]
 
     class FakeCursor:
@@ -71,20 +71,23 @@ def test_read_source_entries_fetches_mapped_rows(monkeypatch, tmp_path: Path) ->
             patient_id="PAT-001",
             insurance_state="Member",
             file_entry="Routine checkup",
-            services="",
+            service="CHK001 XRAY010",
         ),
         FileEntry(
             entry_date=date(2026, 3, 15),
             patient_id="PAT-002",
             insurance_state="Private",
             file_entry="Follow-up",
-            services="",
+            service="FUP050",
         ),
     ]
     assert "Trusted_Connection=yes;" in captured["connection_string"]
     assert "DATABASE=DentalDB;" in captured["connection_string"]
     assert "FROM ck.KARTEI AS k" in captured["query"]
     assert "LEFT JOIN ck.PATKASSE AS p" in captured["query"]
+    assert "WITH services_by_day AS" in captured["query"]
+    assert "FROM ck.LEISTUNG AS l" in captured["query"]
+    assert "STRING_AGG" in captured["query"]
 
 def test_read_source_entries_query_deduplicates_by_chain(monkeypatch, tmp_path: Path) -> None:
     """
@@ -124,6 +127,9 @@ def test_read_source_entries_query_deduplicates_by_chain(monkeypatch, tmp_path: 
     assert "COALESCE(k.FOLLOWERID, k.ID)" in q
     assert "ORDER BY k.ID DESC" in q
     assert "WHERE rn = 1" in q
+    assert "LEFT JOIN services_by_day AS s" in q
+    assert "s.PATIENTID = k.PATNR" in q
+    assert "s.DATUM = CONVERT(date, k.DATUM)" in q
 
 
 def test_run_cycle_writes_full_snapshot_and_returns_count(
@@ -139,14 +145,14 @@ def test_run_cycle_writes_full_snapshot_and_returns_count(
             patient_id="PAT-001",
             insurance_state="Member",
             file_entry="Routine checkup",
-            services="CHK001",
+            service="CHK001",
         ),
         FileEntry(
             entry_date=date(2026, 3, 15),
             patient_id="PAT-002",
             insurance_state="Private",
             file_entry="Follow-up",
-            services="FUP050",
+            service="FUP050",
         ),
     ]
     monkeypatch.setattr("clieno_extractor.extractor.read_source_entries", lambda _settings: entries)
@@ -155,7 +161,7 @@ def test_run_cycle_writes_full_snapshot_and_returns_count(
 
     assert extracted_count == 2
     assert _read_output_lines(output_csv) == [
-        "entry_date,patient_id,insurance_state,file_entry,services",
+        "entry_date,patient_id,insurance_state,file_entry,service",
         "2026-03-14,PAT-001,Member,Routine checkup,CHK001",
         "2026-03-15,PAT-002,Private,Follow-up,FUP050",
     ]
@@ -172,7 +178,7 @@ def test_run_cycle_overwrites_existing_snapshot(tmp_path: Path, monkeypatch) -> 
             patient_id="PAT-001",
             insurance_state="Member",
             file_entry="Initial",
-            services="SVC-A",
+            service="SVC-A",
         )
     ]
     second_entries = [
@@ -181,7 +187,7 @@ def test_run_cycle_overwrites_existing_snapshot(tmp_path: Path, monkeypatch) -> 
             patient_id="PAT-999",
             insurance_state="Retired",
             file_entry="Replacement",
-            services="SVC-B",
+            service="SVC-B",
         )
     ]
 
@@ -192,7 +198,7 @@ def test_run_cycle_overwrites_existing_snapshot(tmp_path: Path, monkeypatch) -> 
     run_cycle(settings)
 
     assert _read_output_lines(output_csv) == [
-        "entry_date,patient_id,insurance_state,file_entry,services",
+        "entry_date,patient_id,insurance_state,file_entry,service",
         "2026-03-15,PAT-999,Retired,Replacement,SVC-B",
     ]
 
