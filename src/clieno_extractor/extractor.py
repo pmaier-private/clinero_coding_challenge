@@ -1,5 +1,4 @@
 import csv
-import pyodbc
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -32,6 +31,8 @@ def _normalize_entry_date(value: object) -> date | None:
 
 def read_source_entries(settings: Settings) -> list[FileEntry]:
 
+    import pyodbc
+
     connection_string = (
         f"DRIVER={{{settings.db_driver}}};"
         f"SERVER={settings.db_server};"
@@ -40,15 +41,24 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
         "TrustServerCertificate=yes;"
     )
     query = f"""
-        SELECT
-            k.DATUM,
-            k.PATNR,
-            p.STATUS,
-            k.BEMERKUNG
-        FROM {settings.db_schema}.KARTEI AS k
-        LEFT JOIN {settings.db_schema}.PATKASSE AS p
-            ON p.PATNR = k.PATNR
-        ORDER BY k.DATUM, k.PATNR
+        WITH latest_entries AS (
+            SELECT
+                k.DATUM,
+                k.PATNR,
+                p.STATUS,
+                k.BEMERKUNG,
+                ROW_NUMBER() OVER (
+                    PARTITION BY COALESCE(k.FOLLOWERID, k.ID)
+                    ORDER BY k.ID DESC
+                ) AS rn
+            FROM {settings.db_schema}.KARTEI AS k
+            LEFT JOIN {settings.db_schema}.PATKASSE AS p
+                ON p.PATNR = k.PATNR
+        )
+        SELECT DATUM, PATNR, STATUS, BEMERKUNG
+        FROM latest_entries
+        WHERE rn = 1
+        ORDER BY DATUM, PATNR
     """
 
     entries: list[FileEntry] = []

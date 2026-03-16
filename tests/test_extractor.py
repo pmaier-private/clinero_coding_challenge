@@ -26,6 +26,12 @@ def _build_settings(tmp_path: Path) -> Settings:
 
 
 def test_read_source_entries_fetches_mapped_rows(monkeypatch, tmp_path: Path) -> None:
+    """
+    Assert that read_source_entries correctly maps rows from the source to 
+    FileEntry instances.
+
+    The test also guards part of the SQL query.
+    """
     captured = {"connection_string": "", "query": ""}
 
     rows = [
@@ -79,6 +85,45 @@ def test_read_source_entries_fetches_mapped_rows(monkeypatch, tmp_path: Path) ->
     assert "DATABASE=DentalDB;" in captured["connection_string"]
     assert "FROM ck.KARTEI AS k" in captured["query"]
     assert "LEFT JOIN ck.PATKASSE AS p" in captured["query"]
+
+def test_read_source_entries_query_deduplicates_by_chain(monkeypatch, tmp_path: Path) -> None:
+    """
+    Assert that the SQL query used in read_source_entries implements the
+    required deduplication logic.
+    """
+    captured = {"query": ""}
+
+    class FakeCursor:
+        def execute(self, query: str) -> None:
+            captured["query"] = query
+
+        def fetchall(self):
+            return []
+
+    class FakeConnection:
+        def cursor(self) -> FakeCursor:
+            return FakeCursor()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(connect=lambda _cs: FakeConnection()),
+    )
+
+    read_source_entries(_build_settings(tmp_path))
+
+    q = captured["query"]
+    assert "ROW_NUMBER()" in q
+    assert "PARTITION BY" in q
+    assert "COALESCE(k.FOLLOWERID, k.ID)" in q
+    assert "ORDER BY k.ID DESC" in q
+    assert "WHERE rn = 1" in q
 
 
 def test_run_cycle_writes_full_snapshot_and_returns_count(
@@ -150,6 +195,9 @@ def test_run_cycle_overwrites_existing_snapshot(tmp_path: Path, monkeypatch) -> 
         "entry_date,patient_id,insurance_state,file_entry,services",
         "2026-03-15,PAT-999,Retired,Replacement,SVC-B",
     ]
+
+
+
 
 
 def test_run_scheduler_stops_after_one_cycle(monkeypatch, tmp_path: Path) -> None:
