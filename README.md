@@ -11,7 +11,7 @@ The idea is to build a PoC of an extraction data pipeline for ivoris, for data
 
 # Requirements
 
-* Update / Data transfer should happen daily, but only if there are changes in the file entries
+* Update / Data transfer should happen daily
 * data shall be stored as csv
 * data shall be retrievable through a REST API endpoint /ivorisextract/kartei
 * the update / transfer interval shall be configurable
@@ -27,7 +27,7 @@ The idea is to build a PoC of an extraction data pipeline for ivoris, for data
 
 We have two components:
 
-* An extractor that checks the ivoris MS SQL database for changes regularily (default: once per day). If there were new file entries, those entries are extracted and send to an API for storage.
+* An extractor that checks the ivoris MS SQLServer database for changes regularily (default: once per day). If there were new file entries, those entries are extracted and send to an API for storage.
 * A storage and retrieval service that offers two endpoints: one for storing the data, and one for retrieving it.
 
 

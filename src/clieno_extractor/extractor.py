@@ -40,6 +40,8 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
         "Trusted_Connection=yes;"
         "TrustServerCertificate=yes;"
     )
+    # Note that the query is specific to MS SQL Server (e.g. "CONVERT(date,
+    # l.DATUM)", "nvarchar(max)") and may need adjustments for other databases.
     query = f"""
         WITH services_by_day AS (
             SELECT
@@ -78,7 +80,13 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
         cursor = connection.cursor()
         cursor.execute(query)
 
-        for raw_entry_date, raw_patient_id, raw_insurance_state, raw_file_entry, raw_service in cursor.fetchall():
+        for (
+            raw_entry_date,
+            raw_patient_id,
+            raw_insurance_state,
+            raw_file_entry,
+            raw_service,
+        ) in cursor.fetchall():
             entry_date = _normalize_entry_date(raw_entry_date)
             if entry_date is None:
                 continue
@@ -102,7 +110,13 @@ def _write_full_output(output_csv: Path, entries: list[FileEntry]) -> None:
     with output_csv.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=["entry_date", "patient_id", "insurance_state", "file_entry", "service"],
+            fieldnames=[
+                "entry_date",
+                "patient_id",
+                "insurance_state",
+                "file_entry",
+                "service",
+            ],
         )
         writer.writeheader()
 
