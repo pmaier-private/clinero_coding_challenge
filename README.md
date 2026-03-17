@@ -1,6 +1,6 @@
-The coding challenge for Clinero
+Clinero Coding Challenge - Ivoris Extractor
 
-The idea is to build a PoC of an extraction data pipeline for ivoris, for data 
+The idea is to build a PoC of an extraction data pipeline for Ivoris, for data 
 
 * date
 * patient id
@@ -18,31 +18,28 @@ The idea is to build a PoC of an extraction data pipeline for ivoris, for data
 * The insurance status (Member, Family insured, Retired, or Private) should be captured in one column
 * The date is the date of the file entry
 
+
+**Note:** Current implementation is ML0: direct CSV storage, no REST API yet.
+
+
 # Nice-to-have
 
 * incremental extract: only extract new data
 
+# Quick start
 
-# design
-
-We have two components:
-
-* An extractor that checks the ivoris MS SQLServer database for changes regularily (default: once per day). If there were new file entries, those entries are extracted and send to an API for storage.
-* A storage and retrieval service that offers two endpoints: one for storing the data, and one for retrieving it.
-
-
-# ML0
-
-Just the extractor, which stores the data directly to csv! No service for data retrieval.
-
-
-## Quick start
+0. Install prerequisites:
+* Ivoris
+* [Python 3.11+](https://www.python.org/downloads/)
+* [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 1. Create the environment and install the project:
 
 	```bash
 	uv sync
 	```
+
+**Note:** Under Windows you may have to replace `uv` with `py -m uv` in the above and following commands.
 
 2. Run one extraction cycle (recommended for local checks):
 
@@ -73,8 +70,26 @@ Environment variables (see `.env.example`):
 * `IVORIS_DB_DRIVER` (default `ODBC Driver 17 for SQL Server`)
 
 
-## Notes
+# design
 
-* Current implementation is ML0 only (direct CSV storage, no REST API yet).
+We have two components:
+
+* An extractor that checks the ivoris MS SQLServer database for changes regularily (default: once per day). If there were new file entries, those entries are extracted and send to an API for storage.
+* A storage and retrieval service that offers two endpoints: one for storing the data, and one for retrieving it.
+
+## ML0
+
+Just the extractor, which stores the data directly to csv! No service for data retrieval.
+
+## decisions
+
+1. Data access through REST API: This allows for a more flexible and scalable architecture, as the data can be accessed by multiple clients and services without direct access to storage. For example, the service could be put onto a different machine / node, or in the cloud.
+
+2. Configuration through environment variables: Wide support for defining different configurations in different technical environments, e.g. in cloud services. The trade-off is less readability and flexibility, e.g. compared to a yaml file.
+
+3. uv as project manager: uv is modern, relatively simple and fast. However, for multi-lingual projects, e.g. including a TS+React frontend, we could use pants, which is more complex but also more powerful and flexible. 
+
+
+
 
  
