@@ -33,6 +33,8 @@ The idea is to build a PoC of an extraction data pipeline for Ivoris, for data
 * [Python 3.11+](https://www.python.org/downloads/)
 * [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
+⚠️ **Important:** The extractor needs to be run on the same machine as the Ivoris database so it has access to it!
+
 1. Create the environment and install the project:
 
 	```bash
