@@ -8,6 +8,7 @@ The idea is to build a PoC of an extraction data pipeline for Ivoris, for data
 * file entry
 * services
 
+![extractor_demo](https://github.com/user-attachments/assets/b1dfec3f-a6b8-43c5-ba88-eff079d7939f)
 
 # Requirements
 
