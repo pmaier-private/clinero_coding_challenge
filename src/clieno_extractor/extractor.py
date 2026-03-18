@@ -9,6 +9,7 @@ from .config import Settings
 
 @dataclass(frozen=True)
 class FileEntry:
+    kartei_id: int
     entry_date: date
     patient_id: str
     insurance_state: str
@@ -29,7 +30,44 @@ def _normalize_entry_date(value: object) -> date | None:
     return None
 
 
-def read_source_entries(settings: Settings) -> list[FileEntry]:
+def _read_previous_max_kartei_id(output_csv: Path) -> int | None:
+    if not output_csv.exists():
+        return None
+
+    with output_csv.open("r", newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        max_kartei_id: int | None = None
+        for row in reader:
+            raw_id = row.get("t_kartei_id")
+            if raw_id is None or raw_id == "":
+                continue
+
+            kartei_id = int(raw_id)
+            max_kartei_id = (
+                kartei_id if max_kartei_id is None else max(max_kartei_id, kartei_id)
+            )
+
+    return max_kartei_id
+
+
+def _read_existing_kartei_ids(output_csv: Path) -> set[int]:
+    if not output_csv.exists() or output_csv.stat().st_size == 0:
+        return set()
+
+    with output_csv.open("r", newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        kartei_ids: set[int] = set()
+        for row in reader:
+            raw_id = row.get("t_kartei_id")
+            if raw_id is None or raw_id == "":
+                continue
+            kartei_ids.add(int(raw_id))
+        return kartei_ids
+
+
+def read_source_entries(
+    settings: Settings, min_kartei_id: int | None = None
+) -> list[FileEntry]:
 
     import pyodbc
 
@@ -42,6 +80,12 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
     )
     # Note that the query is specific to MS SQL Server (e.g. "CONVERT(date,
     # l.DATUM)", "nvarchar(max)") and may need adjustments for other databases.
+    where_clause = "WHERE rn = 1"
+    parameters: list[object] = []
+    if min_kartei_id is not None:
+        where_clause += " AND ID > ?"
+        parameters.append(min_kartei_id)
+
     query = f"""
         WITH services_by_day AS (
             SELECT
@@ -53,6 +97,7 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
         ),
         latest_entries AS (
             SELECT
+                k.ID,
                 k.DATUM,
                 k.PATNR,
                 p.STATUS,
@@ -69,18 +114,19 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
                 ON s.PATIENTID = k.PATNR
                 AND s.DATUM = CONVERT(date, k.DATUM)
         )
-        SELECT DATUM, PATNR, STATUS, BEMERKUNG, SERVICE
+            SELECT ID, DATUM, PATNR, STATUS, BEMERKUNG, SERVICE
         FROM latest_entries
-        WHERE rn = 1
+            {where_clause}
         ORDER BY DATUM, PATNR
     """
 
     entries: list[FileEntry] = []
     with pyodbc.connect(connection_string) as connection:
         cursor = connection.cursor()
-        cursor.execute(query)
+        cursor.execute(query, *parameters)
 
         for (
+            raw_kartei_id,
             raw_entry_date,
             raw_patient_id,
             raw_insurance_state,
@@ -93,6 +139,7 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
 
             entries.append(
                 FileEntry(
+                    kartei_id=int(raw_kartei_id),
                     entry_date=entry_date,
                     patient_id=str(raw_patient_id or ""),
                     insurance_state=str(raw_insurance_state or ""),
@@ -104,10 +151,24 @@ def read_source_entries(settings: Settings) -> list[FileEntry]:
     return entries
 
 
-def _write_full_output(output_csv: Path, entries: list[FileEntry]) -> None:
+def _write_full_output(
+    output_csv: Path,
+    entries: list[FileEntry],
+    existing_kartei_ids: set[int],
+) -> None:
     output_csv.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_csv.open("w", newline="", encoding="utf-8") as handle:
+    filtered_entries = [
+        entry for entry in entries if entry.kartei_id not in existing_kartei_ids
+    ]
+    skipped = len(entries) - len(filtered_entries)
+    if skipped > 0:
+        print(f"Skipped {skipped} duplicate entries.")
+
+    file_has_content = output_csv.exists() and output_csv.stat().st_size > 0
+    mode = "a" if file_has_content else "w"
+
+    with output_csv.open(mode, newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
             fieldnames=[
@@ -116,11 +177,13 @@ def _write_full_output(output_csv: Path, entries: list[FileEntry]) -> None:
                 "insurance_state",
                 "file_entry",
                 "service",
+                "t_kartei_id",
             ],
         )
-        writer.writeheader()
+        if not file_has_content:
+            writer.writeheader()
 
-        for entry in entries:
+        for entry in filtered_entries:
             writer.writerow(
                 {
                     "entry_date": entry.entry_date.isoformat(),
@@ -128,13 +191,16 @@ def _write_full_output(output_csv: Path, entries: list[FileEntry]) -> None:
                     "insurance_state": entry.insurance_state,
                     "file_entry": entry.file_entry,
                     "service": entry.service,
+                    "t_kartei_id": entry.kartei_id,
                 }
             )
 
 
 def run_cycle(settings: Settings) -> int:
-    source_entries = read_source_entries(settings)
-    _write_full_output(settings.output_csv, source_entries)
+    min_kartei_id = _read_previous_max_kartei_id(settings.output_csv)
+    source_entries = read_source_entries(settings, min_kartei_id=min_kartei_id)
+    existing_kartei_ids = _read_existing_kartei_ids(settings.output_csv)
+    _write_full_output(settings.output_csv, source_entries, existing_kartei_ids)
     return len(source_entries)
 
 
