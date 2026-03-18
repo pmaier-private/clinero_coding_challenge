@@ -10,6 +10,11 @@ The idea is to build a PoC of an extraction data pipeline for Ivoris, for data
 
 ![extractor_demo](https://github.com/user-attachments/assets/b1dfec3f-a6b8-43c5-ba88-eff079d7939f)
 
+# Implementation State
+
+* ML0: direct CSV storage, no REST API yet.
+* **Update:** now with incremental extraction! 
+
 # Requirements
 
 * Update / Data transfer should happen daily
