@@ -119,7 +119,9 @@ def test_read_source_entries_captures_kartei_id(monkeypatch, tmp_path: Path) -> 
     assert "STRING_AGG" in captured["query"]
 
 
-def test_read_source_entries_query_deduplicates_by_chain(monkeypatch, tmp_path: Path) -> None:
+def test_read_source_entries_query_deduplicates_by_chain(
+    monkeypatch, tmp_path: Path
+) -> None:
     captured = {"query": ""}
 
     class FakeCursor:
@@ -158,7 +160,9 @@ def test_read_source_entries_query_deduplicates_by_chain(monkeypatch, tmp_path: 
     assert "s.DATUM = CONVERT(date, k.DATUM)" in q
 
 
-def test_read_source_entries_with_min_kartei_id_filters(monkeypatch, tmp_path: Path) -> None:
+def test_read_source_entries_with_min_kartei_id_filters(
+    monkeypatch, tmp_path: Path
+) -> None:
     captured: dict[str, object] = {"query": "", "params": ()}
 
     class FakeCursor:
@@ -191,7 +195,9 @@ def test_read_source_entries_with_min_kartei_id_filters(monkeypatch, tmp_path: P
     assert captured["params"] == (100,)
 
 
-def test_read_source_entries_min_kartei_id_none_no_filter(monkeypatch, tmp_path: Path) -> None:
+def test_read_source_entries_min_kartei_id_none_no_filter(
+    monkeypatch, tmp_path: Path
+) -> None:
     captured: dict[str, object] = {"query": "", "params": ()}
 
     class FakeCursor:
@@ -267,7 +273,10 @@ def test_write_full_output_includes_t_kartei_id_column(tmp_path: Path) -> None:
     extractor_mod._write_full_output(output_csv, entries, existing_kartei_ids=set())
 
     lines = _read_output_lines(output_csv)
-    assert lines[0] == "entry_date,patient_id,insurance_state,file_entry,service,t_kartei_id"
+    assert (
+        lines[0]
+        == "entry_date,patient_id,insurance_state,file_entry,service,t_kartei_id"
+    )
     assert lines[1].endswith(",100")
 
 
@@ -414,9 +423,13 @@ def test_write_output_skips_entries_with_existing_kartei_id(tmp_path: Path) -> N
     assert [row["t_kartei_id"] for row in rows] == ["100", "101"]
 
 
-def test_run_cycle_bootstraps_checkpoint_on_first_run(tmp_path: Path, monkeypatch) -> None:
+def test_run_cycle_bootstraps_checkpoint_on_first_run(
+    tmp_path: Path, monkeypatch
+) -> None:
     output_csv = tmp_path / "ivoris_extract.csv"
-    settings = Settings(**{**_build_settings(tmp_path).__dict__, "output_csv": output_csv})
+    settings = Settings(
+        **{**_build_settings(tmp_path).__dict__, "output_csv": output_csv}
+    )
 
     seen: dict[str, object] = {}
     bootstrap_entries = [
@@ -464,7 +477,9 @@ def test_run_cycle_passes_existing_ids_to_writer(tmp_path: Path, monkeypatch) ->
         "2026-03-14,PAT-001,Member,Initial,SVC-A,42\n",
         encoding="utf-8",
     )
-    settings = Settings(**{**_build_settings(tmp_path).__dict__, "output_csv": output_csv})
+    settings = Settings(
+        **{**_build_settings(tmp_path).__dict__, "output_csv": output_csv}
+    )
 
     new_entries = [
         FileEntry(
