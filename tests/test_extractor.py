@@ -231,6 +231,9 @@ def test_read_source_entries_min_kartei_id_none_no_filter(
 
 
 def test_read_previous_max_kartei_id_nonexistent_csv(tmp_path: Path) -> None:
+    # FIXME: Should _read_previous_max_kartei_id rather throw an error if the
+    # file doesn't exist, instead of silently returning None? This would make it
+    # easier to catch misconfigurations where the output path is wrong.
     assert extractor_mod._read_previous_max_kartei_id(tmp_path / "missing.csv") is None
 
 
