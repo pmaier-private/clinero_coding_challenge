@@ -80,6 +80,8 @@ def read_source_entries(
     )
     # Note that the query is specific to MS SQL Server (e.g. "CONVERT(date,
     # l.DATUM)", "nvarchar(max)") and may need adjustments for other databases.
+    # FIXME: THe string formatting might still be vulnerable to SQL injection if
+    # `settings.db_schema` is not controlled. Using a whitelist? Via Typing?
     where_clause = "WHERE rn = 1"
     parameters: list[object] = []
     if min_kartei_id is not None:
