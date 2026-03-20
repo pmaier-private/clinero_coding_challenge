@@ -97,6 +97,8 @@ Just the extractor, which stores the data directly to csv! No service for data r
 
 3. uv as project manager: uv is modern, relatively simple and fast. However, for multi-lingual projects, e.g. including a TS+React frontend, we could use pants, which is more complex but also more powerful and flexible. 
 
+4. Stateless extractor with state management in data: The approach stores the state (last read ID) together with the extracted data, making the extractor itself stateless. This simplifies deployment and restart of the extractor. The trade-off is the need to design a data model that captures state information, or maintain a separate model for metadata.
+
 
 
 
